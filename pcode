@@ -1,0 +1,58 @@
+
+#read h5
+fn = os.path.join(folder_path,"fhsi_2005-20140313(edited version).hdf5")
+store = pd.HDFStore(fn)
+print(store)
+data_0506= store.select('fhsi_2005-20140313')
+list(data_0506.columns.values)
+store.close()
+
+
+
+
+#effective is20051201 to 20070130(only this period is reliable)
+data_0506=data_0506.loc[(data_0506['Date']>=dt(2005,12,1,0,0,0))&(data_0506['Date']<=dt(2007,1,30,0,0,0)),:]
+data_0506['Date2']=data_0506['Date'].apply(lambda x: dt.strftime(x,"%Y-%m-%d"))
+data_0506=data_0506.reset_index(drop=True)
+check_last_two=pd.DataFrame()
+i='2005-12-01'
+for i in data_0506['Date2'].unique().tolist():
+    data_0506_temp=data_0506.loc[data_0506['Date2']==i,:][0:1]
+    check_last_two=check_last_two.append(data_0506_temp)
+    data_0506_temp=data_0506.loc[data_0506['Date2']==i,:][-1:]
+    check_last_two=check_last_two.append(data_0506_temp)
+
+
+
+
+
+
+
+
+#read h5
+import os
+import numpy as np
+from pandas import HDFStore,DataFrame
+import pandas as pd
+from datetime import datetime as dt
+import datetime
+fn = os.path.join(r"C:\Users\alexlau\Dropbox\notebooks\index_analysis\mis","ib_historical20170731.hdf5")
+store = pd.HDFStore(fn)
+print(store)
+data_ib= store.select('ib_data')
+
+store.close()
+
+check_last_two=pd.DataFrame()
+i='2019-03-27'
+for i in data_ib['Date'].unique().tolist():
+    data_ib_temp=data_ib.loc[data_ib['Date']==i,:][0:1]
+    check_last_two=check_last_two.append(data_ib_temp)
+    data_ib_temp=data_ib.loc[data_ib['Date']==i,:][-1:]
+    check_last_two=check_last_two.append(data_ib_temp)
+
+check_last_two['hms']=check_last_two['date'].apply(lambda x: dt.strftime(x,"%H:%M:%S"))
+#20181002 hv problem need to merge from other source
+
+
+
