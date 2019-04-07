@@ -1,0 +1,110 @@
+#make special volumn factor 
+#read FHSI_minute_20051201to20190326.hdf5
+import os
+import numpy as np
+from pandas import HDFStore,DataFrame
+import pandas as pd
+from datetime import datetime as dt
+import datetime
+from pandas import read_excel
+
+folder_path=r"C:\Users\notebooks\index_analysis\mis"
+fn = os.path.join(folder_path,"FHSI_minute_20051201to20190326.hdf5")
+store = pd.HDFStore(fn)
+print(store)
+data_all_final= store.select('FHSI_minute')
+ 
+store.close()
+
+data_all_final_check=data_all_final.head(10)
+
+
+
+data_fhsi_minute=data_all_final[['date_ymd_hms','date_ymd','Open','High','Low','Close','TotalVolume']].copy()
+data_fhsi_minute=data_fhsi_minute.rename(columns={'date_ymd_hms':'Date1','date_ymd':'Date2'})
+data_fhsi_minute=data_fhsi_minute.reset_index(drop=True)
+
+
+#analyse volumn in last n minute, if price increase, volumn change is +ve, vice verser.
+start_row=-31 #(-31 and -1 is last 30 mins)
+end_row=-1
+x=data_fhsi_minute.loc[data_fhsi_minute['Date2']=='2013-10-07',:].reset_index(drop=True)
+def analyse_volumn(x,start_row,end_row):
+    x['cum_vol']=x['TotalVolume'].cumsum()
+    if end_row>=0:
+        data_use=x[(start_row):(end_row)].copy()
+    else:
+        data_use=x[(start_row):(x.shape[0]+1+end_row)].copy()
+
+    data_use=data_use.reset_index(drop=True)
+    size=data_use.shape[0]
+
+    vol_change=(data_use['cum_vol'].values[size-1]-data_use['cum_vol'].values[0])/data_use['cum_vol'].values[0] if data_use['cum_vol'].values[0]!=0 else 0
+    price_change=1 if ((data_use['Close'].values[size-1]-data_use['Close'].values[0])>=0) else -1
+    vol_change=vol_change*price_change
+    
+    date_target=data_use['Date2'].values[0]
+    datenum=(dt.strptime(date_target,"%Y-%m-%d")-dt(1970,1,1)).days
+    return pd.Series([date_target,vol_change,datenum])
+ 
+
+
+data_fhsi_minute_extracted=data_fhsi_minute.groupby('Date2').apply(lambda x:analyse_volumn(x.reset_index(drop=True),-6,-1))
+data_fhsi_minute_extracted=data_fhsi_minute_extracted.rename(columns={0:'Date2',1:'FHSIVol4_change',2:'DateNum'}) 
+data_fhsi_minute_extracted=data_fhsi_minute_extracted.reset_index(drop=True)
+
+os.chdir(r'C:\Users\\Dropbox\notebooks\index_analysis')
+writer = pd.ExcelWriter('FHSIVol4_with_tidy.xlsx', engine='xlsxwriter')
+data_fhsi_minute_extracted.to_excel(writer, sheet_name='Sheet1')
+writer.save()
+
+
+
+
+
+#find 10 largest volumns
+start_row=-60
+end_row=-1
+see_how_many=10 #(sort by volumn then find out how many largest to be considered)
+cut_off=8 #if 8 out of see_how_many is +ve then output 1
+x=data_fhsi_minute.loc[data_fhsi_minute['Date2']=='2013-10-07',:].reset_index(drop=True)
+
+start_row=-10
+end_row=-1
+see_how_many=1
+cut_off=1
+x=data_fhsi_minute.loc[data_fhsi_minute['Date2']=='2019-03-26',:].reset_index(drop=True)
+
+
+def analyse_volumn(x,start_row,end_row,see_how_many,cutoff):
+    x['cum_vol']=x['TotalVolume'].cumsum()
+    x['price_change']=x['Close']-x['Open']
+    if end_row>=0:
+        data_use=x[(start_row):(end_row)].copy()
+    else:
+        data_use=x[(start_row):(x.shape[0]+1+end_row)].copy()
+
+    date_target=data_use['Date2'].values[0]
+    datenum=(dt.strptime(date_target,"%Y-%m-%d")-dt(1970,1,1)).days        
+    data_use=data_use.sort_values(by=['TotalVolume'],ascending=[False])[0:see_how_many]
+    data_use=data_use.reset_index(drop=True)
+    count_price_up=sum(data_use.price_change.values>0)
+    count_price_down=sum(data_use.price_change.values<0)
+    
+    output=0
+    if count_price_up>=cut_off: output=1 
+    if count_price_down>=cut_off: output=-1 
+    
+    return pd.Series([date_target,output,datenum])
+
+
+
+
+data_fhsi_minute_extracted=data_fhsi_minute.groupby('Date2').apply(lambda x:analyse_volumn(x.reset_index(drop=True),-15,-1,10,6))
+data_fhsi_minute_extracted=data_fhsi_minute_extracted.rename(columns={0:'Date2',1:'volcountne15po10po6_change',2:'DateNum'}) 
+data_fhsi_minute_extracted=data_fhsi_minute_extracted.reset_index(drop=True)
+
+os.chdir(r'C:\Users\\Dropbox\notebooks\index_analysis')
+writer = pd.ExcelWriter('volcountne15po10po6_with_tidy.xlsx', engine='xlsxwriter')
+data_fhsi_minute_extracted.to_excel(writer, sheet_name='Sheet1')
+writer.save()
