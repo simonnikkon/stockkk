@@ -1,0 +1,213 @@
+
+
+
+#https://www.statsmodels.org/stable/examples/notebooks/generated/glm_weights.html
+import os
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
+#os.chdir(r"C:\Users\alex.lau\Desktop\adhot\ub\ub_data")
+os.chdir("/home/alexlau/Dropbox/notebooks/docs/ubs_data/UBS_TES_Interview")
+
+
+train=pd.read_csv("trainingdata.csv")
+test=pd.read_csv("testdata.csv")
+
+#python glm variables' name cannot start with digit and include '-'
+train=train.rename(columns={'28-59DaysPastDue':'V28_59DaysPastDue','60-90DaysPastDue':'V60_90DaysPastDue','91DaysLate':'V91DaysLate'})
+test=test.rename(columns={'28-59DaysPastDue':'V28_59DaysPastDue','60-90DaysPastDue':'V60_90DaysPastDue','91DaysLate':'V91DaysLate'})
+
+#explore data validity
+a=train.describe()
+
+#max age is 109 and max number of dependents is 20. but they are possible. had better double check
+#some values in 28-59DaysPastDue, 60-90DaysPastDue and 91DaysLate are greater than 96 simultaniously in two years, which doesn't make sense
+#replace them by NA and later after standardization, they will be filled with zero, which is mean.
+train.loc[train['V28_59DaysPastDue']>=96,'V28_59DaysPastDue']=np.nan
+train.loc[train['V60_90DaysPastDue']>=96,'V60_90DaysPastDue']=np.nan
+train.loc[train['V91DaysLate']>=96,'V91DaysLate']=np.nan
+
+test.loc[test['V28_59DaysPastDue']>=96,'V28_59DaysPastDue']=np.nan
+test.loc[test['V60_90DaysPastDue']>=96,'V60_90DaysPastDue']=np.nan
+test.loc[test['V91DaysLate']>=96,'V91DaysLate']=np.nan
+        
+
+train['debt_age']=train['DebtRatio']*train['MonthlyIncome']*train['age']
+test['debt_age']=test['DebtRatio']*test['MonthlyIncome']*train['age']
+
+
+#train['No_of_OpenCredit_RealEstate']=train['NumberOfOpenCreditLinesAndLoans']+train['NumberRealEstateLoansOrLines']
+#test['No_of_OpenCredit_RealEstate']=test['NumberOfOpenCreditLinesAndLoans']+test['NumberRealEstateLoansOrLines']
+
+train.loc[train['UtilisationRatio']>1,'UtilisationRatio']=1
+test.loc[test['UtilisationRatio']>1,'UtilisationRatio']=1
+
+#train['Debt_over_dependents']=train['DebtRatio']*train['MonthlyIncome']/train['NumberOfDependents']
+#test['Debt_over_dependents']=test['DebtRatio']*test['MonthlyIncome']/test['NumberOfDependents']
+
+train.loc[train['DebtRatio']>1,'DebtRatio_greater_1']=train['DebtRatio']
+train['DebtRatio_greater_1']=train['DebtRatio_greater_1'].fillna(0)
+train.loc[train['DebtRatio']<=1,'DebtRatio_less_1']=train['DebtRatio']
+train['DebtRatio_less_1']=train['DebtRatio_less_1'].fillna(0)
+
+test.loc[test['DebtRatio']>1,'DebtRatio_greater_1']=test['DebtRatio']
+test['DebtRatio_greater_1']=test['DebtRatio_greater_1'].fillna(0)
+test.loc[test['DebtRatio']<=1,'DebtRatio_less_1']=test['DebtRatio']
+test['DebtRatio_less_1']=test['DebtRatio_less_1'].fillna(0)
+
+
+
+
+#train.loc[(train['NumberOfDependents']==0)&(train['DebtRatio']>=1),'DebtRatio_dependents_zero']=train['DebtRatio']
+#train['DebtRatio_dependents_zero']=train['DebtRatio_dependents_zero'].fillna(0)
+#test.loc[(test['NumberOfDependents']==0)&(test['DebtRatio']>=1),'DebtRatio_dependents_zero']=test['DebtRatio']
+#test['DebtRatio_dependents_zero']=test['DebtRatio_dependents_zero'].fillna(0)
+
+
+#train['realestate_over_dependents']=train['NumberRealEstateLoansOrLines']/train['NumberOfDependents'] #tiny improvement
+#train.loc[train['realestate_over_dependents']==float("inf"),'realestate_over_dependents']=0
+#test['realestate_over_dependents']=test['NumberRealEstateLoansOrLines']/test['NumberOfDependents']
+#test.loc[test['realestate_over_dependents']==float("inf"),'realestate_over_dependents']=0
+
+
+#train['MonthlyIncome_over_dependents']=train['MonthlyIncome']/train['NumberOfDependents'] #tiny improvement
+#train.loc[train['MonthlyIncome_over_dependents']==float("inf"),'MonthlyIncome_over_dependents']=0
+#test['MonthlyIncome_over_dependents']=test['MonthlyIncome']/test['NumberOfDependents']
+#test.loc[test['MonthlyIncome_over_dependents']==float("inf"),'MonthlyIncome_over_dependents']=0
+
+
+#train['MonthlyIncome_over_dependents']=train['MonthlyIncome]*train['NumberOfDependents'] #tiny improvement
+#test['realestate_over_dependents']=test['NumberRealEstateLoansOrLines']*test['NumberOfDependents']
+
+
+#explore data validity
+a=train.describe()        
+        
+        
+#training set
+train_xy=train.iloc[:100000,1:].copy()
+#validation set
+valid_xy=train.iloc[100000:,1:].copy()
+
+#test set
+test_xy=test.iloc[:,1:].copy()
+
+
+
+
+
+
+train_xy['V28morePastDue']=train_xy['V28_59DaysPastDue']+train_xy['V91DaysLate']+train_xy['V60_90DaysPastDue']
+valid_xy['V28morePastDue']=valid_xy['V28_59DaysPastDue']+valid_xy['V91DaysLate']+valid_xy['V60_90DaysPastDue']
+test_xy['V28morePastDue']=test_xy['V28_59DaysPastDue']+test_xy['V91DaysLate']+test_xy['V60_90DaysPastDue']
+
+
+response_use='delinquency'
+variable_use=['UtilisationRatio','age','V28_59DaysPastDue','DebtRatio','MonthlyIncome',
+              'NumberOfOpenCreditLinesAndLoans','V91DaysLate','NumberRealEstateLoansOrLines','V60_90DaysPastDue','NumberOfDependents']
+
+variable_use=['UtilisationRatio','age','V28_59DaysPastDue','debt_age',
+              'NumberOfOpenCreditLinesAndLoans','V91DaysLate','NumberRealEstateLoansOrLines','V60_90DaysPastDue','NumberOfDependents']
+
+variable_use=['UtilisationRatio','age','debt_age','V28morePastDue',
+              'NumberOfOpenCreditLinesAndLoans','NumberRealEstateLoansOrLines','NumberOfDependents']
+
+#variable_use=['UtilisationRatio','age','debt_age','V28morePastDue',
+#              'No_of_OpenCredit_RealEstate','NumberOfDependents']
+
+variable_use=['UtilisationRatio','age','debt_age','V28morePastDue',
+              'NumberOfOpenCreditLinesAndLoans','NumberRealEstateLoansOrLines','NumberOfDependents',
+              'DebtRatio_greater_1','DebtRatio_less_1']
+
+
+#variable_use=['UtilisationRatio','age','debt_age','V28morePastDue',
+#              'NumberOfOpenCreditLinesAndLoans','NumberRealEstateLoansOrLines','NumberOfDependents',
+#              'DebtRatio_greater_1','DebtRatio_less_1','DebtRatio_dependents_zero']#realestate_over_dependents']
+
+
+
+train_xy=train_xy[[response_use]+variable_use].copy()
+valid_xy=valid_xy[[response_use]+variable_use].copy()
+test_xy=test_xy[[response_use]+variable_use].copy()
+
+
+#take log
+list(train_xy.columns.values)
+for col in variable_use:
+    train_xy[col]=train_xy[col].apply(lambda x:np.log(x) if x!=0 else 0)
+    valid_xy[col]=valid_xy[col].apply(lambda x:np.log(x) if x!=0 else 0)
+    test_xy[col]=test_xy[col].apply(lambda x:np.log(x) if x!=0 else 0)
+
+#standardize
+train_col_mean=train_xy.iloc[:,1:].mean()
+train_col_std=train_xy.iloc[:,1:].std()
+
+#apply training's mean and std to validation
+train_xy.iloc[:,1:]=(train_xy.iloc[:,1:]-train_col_mean)/train_col_std
+valid_xy.iloc[:,1:]=(valid_xy.iloc[:,1:]-train_col_mean)/train_col_std
+                   
+#apply training and validation's mean and std to test
+train_valid=train_xy.append(valid_xy)
+train_valid_mean=train_valid.iloc[:,1:].mean()
+train_valid_std=train_valid.iloc[:,1:].std()
+
+test_xy.iloc[:,1:]=(test_xy.iloc[:,1:]-train_valid_mean)/train_valid_std
+             
+                   
+                   
+#fill na by zero
+train_xy=train_xy.fillna(0)
+valid_xy=valid_xy.fillna(0)
+test_xy=test_xy.fillna(0)
+
+
+
+
+
+
+#create model
+model_formula=response_use+' ~ '+'+'.join(variable_use)
+glm = smf.glm(model_formula,data=train_xy, family=sm.families.Binomial())
+result = glm.fit()
+print(result.summary())
+
+y_pred = result.predict(train_xy)
+y_pred_valid = result.predict(train_valid)
+
+result.params
+
+result.null_deviance  #2*loglikelihood
+result.deviance
+
+
+
+#this custom deviance calculation ties with the calculation in both python/R
+def deviances(y_true,y_predicted):
+    key_one=y_true!=0
+    key_zero=y_true==0
+    y_true_one=y_true[key_one]
+    y_predicted_one=y_predicted[key_one]
+    y_true_zero=y_true[key_zero]
+    y_predicted_zero=y_predicted[key_zero]
+    dev=2*(sum(y_true_one*np.log(y_true_one/y_predicted_one))+sum((1-y_true_zero)*np.log((1-y_true_zero)/(1-y_predicted_zero))))
+    return dev
+
+#deviances in training
+y_true=train_xy[response_use].values
+y_predicted=result.predict(train_xy).values
+deviances(y_true,y_predicted)  #40402 40386.53408214874, 39127, 38856, 38842
+
+#deviances in validation
+y_true_valid=valid_xy[response_use].values
+y_predicted_valid=result.predict(valid_xy).values
+deviances(y_true_valid,y_predicted_valid)   #20099 20090.73519208953, 19502,19361,19352
+
+
+
+
+
+
+
+
+
