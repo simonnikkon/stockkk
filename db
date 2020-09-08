@@ -1,16 +1,6 @@
 
 
 
-#https://www.statsmodels.org/stable/examples/notebooks/generated/glm_weights.html
-import os
-import numpy as np
-import pandas as pd
-import statsmodels.formula.api as smf
-import statsmodels.api as sm
-#os.chdir(r"C:\Users\alex.lau\Desktop\adhot\ub\ub_data")
-os.chdir("/home/alexlau/Dropbox/notebooks/docs/ubs_data/UBS_TES_Interview")
-
-
 train=pd.read_csv("trainingdata.csv")
 test=pd.read_csv("testdata.csv")
 
